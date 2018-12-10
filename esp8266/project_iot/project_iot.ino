@@ -3,13 +3,14 @@
 #include <ArduinoJson.h>
 
 // Set these to your desired credentials.
-const char* ssid = "";
-const char* password = "";
+const char* ssid = "M&T2.4G";
+const char* password = "seinaovei";
 
-const char* host = "";
+const char* host = "http://625a33d1.ngrok.io/iot";
 
 const char* humTempType = "HumTemp";
 const char* touchType = "Touch";
+const char* ldrType = "Luminosity";
 
 // DHT Sensor
 int DHpin = D0;
@@ -31,45 +32,30 @@ byte readData () {
 int makeHttpRequest(char *sensorType, float arr[]) {
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("WiFi Connected");
-    HTTPClient http;
-    http.begin(host);
-    http.addHeader("Content-Type", "application/json");
     
     if  (sensorType == humTempType) {
       StaticJsonBuffer<200> jsonBuffer;
       JsonObject& body = jsonBuffer.createObject();
-      body["sensorType"] = "hum_temp";
+      body["sensorType"] = "HumTemp";
       body["humidity"] = arr[0];
       body["temperature"] = arr[1];
 
-      char JSONmessageBuffer[300];
-      body.prettyPrintTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
-      Serial.println(JSONmessageBuffer);
-      
-      int httpCode = http.POST(JSONmessageBuffer);
-      String payload = http.getString();
-      
-      Serial.println(httpCode);
-      Serial.println(payload);
+      sendRequest(body);
     } else if (sensorType == touchType) {
       StaticJsonBuffer<200> jsonBuffer;
       JsonObject& body = jsonBuffer.createObject();
-      body["sensorType"] = "touch";
+      body["sensorType"] = "Touch";
       body["touched"] = "true";
 
-      char JSONmessageBuffer[300];
-      body.prettyPrintTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
+      sendRequest(body);
+    } else if (sensorType == ldrType) {
+      StaticJsonBuffer<200> jsonBuffer;
+      JsonObject& body = jsonBuffer.createObject();
+      body["sensorType"] = "Luminosity";
+      body["lumens"] = arr[0];
 
-      Serial.println(JSONmessageBuffer);
-      
-      int httpCode = http.POST(JSONmessageBuffer);
-      String payload = http.getString();
-      
-      Serial.println(httpCode);
-      Serial.println(payload);
+      sendRequest(body);
     }
-
-    http.end();
   } else {
  
     Serial.println("Error in WiFi connection");
@@ -77,7 +63,25 @@ int makeHttpRequest(char *sensorType, float arr[]) {
   }  
 }
 
-int getLdrVoltage() {
+void sendRequest(JsonObject& body) {
+  HTTPClient http;
+  http.begin(host);
+  http.addHeader("Content-Type", "application/json");
+    
+  char JSONmessageBuffer[300];
+  body.prettyPrintTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
+  Serial.println(JSONmessageBuffer);
+  
+  int httpCode = http.POST(JSONmessageBuffer);
+  String payload = http.getString();
+  
+  Serial.println(httpCode);
+  Serial.println(payload);
+
+  http.end();
+}
+
+void getLdrVoltage() {
   // read the input on analog pin 0:
   int sensorValue = analogRead(A0);
   
@@ -86,7 +90,11 @@ int getLdrVoltage() {
   
   // print out the value you read:
   Serial.println(voltage);
-  return voltage;
+
+  float arr[1];
+  arr[0] = voltage;
+  
+  makeHttpRequest("Luminosity", arr);
 }
 
 void getTempAndHumidity() {
@@ -161,6 +169,7 @@ void loop () {
   if (WiFi.status() == WL_CONNECTED) {
     getTempAndHumidity();
     getTouch();
+    getLdrVoltage();
   } else {
     Serial.println("No internet...");
   }
